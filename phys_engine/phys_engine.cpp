@@ -129,13 +129,13 @@ public:
     }
 
     void shooting() {
-        Vector2i mouse1 = Mouse::getPosition(win);
-        Vector2i mouse2 = Mouse::getPosition(win);
+        vec mouse1 = { double(Mouse::getPosition(win).x), double( Mouse::getPosition(win).y) };
+        vec mouse2 = { double(Mouse::getPosition(win).x), double(Mouse::getPosition(win).y) };
         vec shoot(0, 0);
         double rad = 0.;
         while (Mouse::isButtonPressed(Mouse::Left)) {
             drawing();
-            mouse2 = Mouse::getPosition(win);
+            mouse2 = { double(Mouse::getPosition(win).x), double(Mouse::getPosition(win).y) };
             rad = sqrt((mouse2.x - mouse1.x) * (mouse2.x - mouse1.x) + (mouse2.y - mouse1.y) * (mouse2.y - mouse1.y)) / 5.;
             if (rad > height / 20) rad = height / 20;
             CircleShape circle(rad);
@@ -147,7 +147,7 @@ public:
             win.display();
         }
         shoot = { double(mouse1.x - mouse2.x), double(mouse1.y - mouse2.y) };
-        shoot = shoot / sqrt((mouse2.x - mouse1.x) * (mouse2.x - mouse1.x) + (mouse2.y - mouse1.y) * (mouse2.y - mouse1.y)) * rad;
+        shoot = shoot / shoot.length() * rad;
         p = p + shoot.anticord() * 3;
     }
 
