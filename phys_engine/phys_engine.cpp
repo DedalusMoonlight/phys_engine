@@ -147,7 +147,7 @@ public:
             win.display();
         }
         shoot = mouse1.anticord() - mouse2.anticord();
-        shoot = shoot / shoot.length();
+        shoot = shoot / shoot.length() * (rad / height * 20);
         p = p + shoot * 4 * m;
 
     }
@@ -194,7 +194,7 @@ int main() {
 
         auto pause1 = std::chrono::system_clock::now();
         Vector2i mouse = Mouse::getPosition(win);
-        if (Mouse::isButtonPressed(Mouse::Left) && (mouse.x - (pos - cam).cord().x) * (mouse.x - (pos - cam).cord().x) + (mouse.y - (pos - cam).cord().y) * (mouse.y - (pos - cam).cord().y) <= radius * radius)
+        if ((p / m).length() < 0.3 && Mouse::isButtonPressed(Mouse::Left) && (mouse.x - (pos - cam).cord().x) * (mouse.x - (pos - cam).cord().x) + (mouse.y - (pos - cam).cord().y) * (mouse.y - (pos - cam).cord().y) <= radius * radius)
         {
             game.shooting();
         }
