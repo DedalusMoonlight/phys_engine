@@ -130,7 +130,7 @@ public:
 
     void shooting() {
         vec mouse1 = { double(Mouse::getPosition(win).x), double( Mouse::getPosition(win).y) };
-        vec mouse2 = { double(Mouse::getPosition(win).x), double(Mouse::getPosition(win).y) };
+        vec mouse2(0, 0);
         vec shoot(0, 0);
         double rad = 0.;
         while (Mouse::isButtonPressed(Mouse::Left)) {
@@ -146,9 +146,10 @@ public:
             win.draw(circle);
             win.display();
         }
-        shoot = { double(mouse1.x - mouse2.x), double(mouse1.y - mouse2.y) };
-        shoot = shoot / shoot.length() * rad;
-        p = p + shoot.anticord() * 3;
+        shoot = mouse1.anticord() - mouse2.anticord();
+        shoot = shoot / shoot.length();
+        p = p + shoot * 4 * m;
+
     }
 
 };
@@ -198,6 +199,7 @@ int main() {
             game.shooting();
         }
         auto pause2 = std::chrono::system_clock::now();
+
 
         Event event;
         while (win.pollEvent(event))
