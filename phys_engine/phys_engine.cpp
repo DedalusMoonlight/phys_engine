@@ -1,6 +1,5 @@
 ﻿/// по управлению: a/d влево вправо (важно вкл анлг язык на клавиатуре), r - возврат, пробел - прыжок (нельхзя делать 2 раза подряд в воздухе). Если застрянет в текстуре - не повезло, словили баг (я пытаюсь их отлавливать, но не всегда выходит, + не доделанная проблема это соударение с отрезком сбоку)
 
-/// если окну плохо - меняйте значения width и height (по умолчанию они 120 и 30)
 
 #include <SFML/Graphics.hpp> 
 #include <fstream>
@@ -40,6 +39,18 @@ public:
     vec anticord() {  //обратное 
         return { (x) * aspect * 2. / width - 1. * aspect, (-1 * y ) * 2. / height + 1.};
     }
+
+    vec rotate(double ang) {
+        vec ans(x, y);
+        double l = ans.length();
+        ans = ans / l;
+        double ang2 = acos(ans.x);
+        if (abs(ang2 - asin(ans.y)) >= 0.001) ang2 *= -1;
+        ans.x = cos(ang2 + ang);
+        ans.y = sin(ang2 + ang);
+        ans = ans * l;
+        return ans;
+    }
 };
 
             
@@ -48,7 +59,11 @@ vec cam(0, 0);
 double m = 1, g = 5, t = 0., kv = 0.005, ku = 0.999;  // параметры системы; масса, ускорение свободного падения, время скажем так одного кадра (при расчете мгновенной скорости и перемещения), коэффиценты трения об воздух и потери энергии при ударе о поверхность
 vec p(0, 0.000001); //импульс
 double tochnost = 2. / height; // для текстур и коллизий с ними
-double radius = height / 20;
+//double radius = height / 20;   //для шарика
+double side = height / 20 * sqrt(2); //для квадрата
+double angle = 0, w = 0; //угол и угловая скорость квадрата
+vec normal(cos(angle), sin(angle));
+
 bool jstriked = false; // прыжок доступен только после удара о поверхность, чтобы на пробел не улетать
 
 class line {
@@ -65,16 +80,20 @@ public:
         return abs((a * dot.x + b * dot.y + c)) / sqrt(a * a + b * b);
     }
 
-
-    bool strike() {  //проверка соударения фигуры и текстуры (точность определения соударения так сказать)
-        return s(pos) < radius / height * 2.;
-    }
-
-    vec norm() {   // единичная нормаль к поверхности, нужна будет при отражении. Я умный и сделяль все красиво, поэтому направление нормали не имеет значения
+    vec norm() {   // единичная нормаль к поверхности, нужна будет при отражении. направление нормали - к игроку
         double a = d1.y - d2.y, b = d2.x - d1.x;
         vec no(a, b);
-        return no /  no.length();
+        no = no * (-1) * (p * no);
+        return no / no.length();
     }
+
+    bool strike() {  //проверка соударения фигуры и текстуры (точность определения соударения так сказать)
+        vec norm1 = normal;
+        if (norm1 * norm() < 0) norm1 = norm1 * (-1);
+        double alpha = acos(norm1 * norm() );
+        return s(pos) < side / height / 2. * (sin(alpha) + cos(alpha));
+    }
+
 
     bool sphere1() {                    // для соударения с крами отрезка
         return (pos - d1) * (d2 - d1) < 0;
@@ -98,10 +117,17 @@ public:
         win.clear(Color(0, 0, 0, 0));
         cam.x = pos.x + 0.3 - p.x / 100;
         cam.y = pos.y - std::max(p.y / 100, -0.05);
-        CircleShape circle(radius);
-        circle.setFillColor(Color(255, 255, 255));
-        circle.move((pos - cam).cord().x - radius, (pos - cam).cord().y - radius);
-        win.draw(circle);
+        CircleShape square(side / sqrt(2), 4);
+        square.setRotation(-angle / 3.141592653589793 * 180 - 45);
+        square.setFillColor(Color(255, 255, 255));
+        vec perem((pos - cam).cord().x - side / sqrt(2), (pos - cam).cord().y - side / sqrt(2));
+        perem = perem.anticord();
+        vec perem2(side / sqrt(2), side / sqrt(2));
+        perem2 = perem2.anticord();
+        perem2 = perem2 - perem2.rotate(angle);
+        perem = (perem + perem2).cord();
+        square.move(perem.x, perem.y);
+        win.draw(square);
         for (int _i = 0; _i < sizeof(textures) / sizeof(textures[0]); _i++) {
             Vertex line[] =
             {
@@ -120,16 +146,15 @@ public:
             vec norm = textures[_i].norm();
             if (textures[_i].sphere1()) norm = pos - textures[_i].d1;   // удар о край коллайдера текстуры обработаем как удар об сферу
             if (textures[_i].sphere2()) norm = pos - textures[_i].d2;
-            if (/*filter[_i] &&*/textures[_i].strike() && (norm * (p * norm) * (-1)) * p < 0) {
-                //вот тут самое сложное в коллизии: по идее, если мы летим К тексутре, то отражаемся, а если ОТ - то пролетаем спокойно (чтобы мы не застревали внутри текстуры. На практике все работает странно, я еще в процессе отлавливания багов)
-                p = (p - norm * (p * norm) / norm.length() / norm.length() * 1.75) * ku;
+            if (/*filter[_i] &&*/textures[_i].strike() ) {
+                p = (p + norm * 2) * ku;
                 jstriked = true;
             }
         }
     }
 
     void shooting() {
-        vec mouse1 = { double(Mouse::getPosition(win).x), double( Mouse::getPosition(win).y) };
+        vec mouse1 = pos - cam;
         vec mouse2(0, 0);
         vec shoot(0, 0);
         double rad = 0.;
@@ -194,7 +219,7 @@ int main() {
 
         auto pause1 = std::chrono::system_clock::now();
         Vector2i mouse = Mouse::getPosition(win);
-        if ((p / m).length() < 0.3 && Mouse::isButtonPressed(Mouse::Left) && (mouse.x - (pos - cam).cord().x) * (mouse.x - (pos - cam).cord().x) + (mouse.y - (pos - cam).cord().y) * (mouse.y - (pos - cam).cord().y) <= radius * radius)
+        if ((p / m).length() < 0.3 && Mouse::isButtonPressed(Mouse::Left) && (mouse.x - (pos - cam).cord().x) * (mouse.x - (pos - cam).cord().x) + (mouse.y - (pos - cam).cord().y) * (mouse.y - (pos - cam).cord().y) <= 2 * side * side)
         {
             game.shooting();
         }
@@ -218,6 +243,7 @@ int main() {
                     if (jstriked) {
                         p.y += 2;
                         jstriked = false;
+                        angle += 0.1;
                     }
                     break;
                 case Keyboard::A:
@@ -227,7 +253,7 @@ int main() {
                     p.x += 0.4 * std::max(2 - p.x, 0.);
                     break;
                 case Keyboard::R:
-                    p = { 0, 0 }; pos = { 0, 0 };
+                    p = { 0, 0 }; pos = { 0, 0 }; w = 0; angle = 0;
                     break;
                 }
             }     
@@ -239,6 +265,7 @@ int main() {
         p.y -= m * g * t;  // сила тяжести
         p = p - (p / m) / (p / m).length() * ((p / m) * (p / m)) * kv * t; // трение воздуха
 
+        normal = { cos(angle), sin(angle) };
        
         auto end = std::chrono::system_clock::now();
         t = std::chrono::duration_cast<std::chrono::milliseconds>(end - pause2 + pause1 - start).count() / 1000.;   // время кадра
